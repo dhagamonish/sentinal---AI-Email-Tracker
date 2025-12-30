@@ -298,10 +298,13 @@ const App: React.FC = () => {
               </div>
 
               <div className="win95-inset bg-[#dfdfdf] p-2 text-[10px] space-y-1">
-                <p className="font-bold border-b border-gray-400 pb-1">Connection Check:</p>
-                <p>• Client ID length: {googleClientId.trim().length} chars</p>
-                <p>• Origins required: <code>{window.location.origin}</code></p>
-                <p className="text-red-700 font-bold mt-1">IMPORTANT: Ensure the URL above is listed in your Google Cloud Console's "Authorized JavaScript Origins".</p>
+                <p className="font-bold border-b border-gray-400 pb-1">OAuth Connection Check:</p>
+                <p>• Current Origin: <code>{window.location.origin}</code></p>
+                {window.location.hostname !== 'localhost' && (
+                  <p className="text-blue-800">• Production Mode: Vercel Detected</p>
+                )}
+                <p className="text-red-700 font-bold mt-1 uppercase">Action Required:</p>
+                <p>Copy the Origin above into your Google Cloud Console "Authorized JavaScript Origins" or Auth will fail.</p>
               </div>
 
               <div className="flex justify-end gap-2">
