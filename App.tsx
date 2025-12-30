@@ -6,7 +6,7 @@ import EmailList from './components/EmailList';
 import AddEmailModal from './components/AddEmailModal';
 import FollowUpGenerator from './components/FollowUpGenerator';
 import { analyzeReply } from './services/geminiService';
-import { initGmailAuth, fetchLatestReply } from './services/gmailService';
+import { initGmailAuth, fetchLatestReply, sendGmail } from './services/gmailService';
 
 const DEFAULT_CLIENT_ID = '911936835748-9dpk13953gm2tm3urjbeckgi8gpe209ua.apps.googleusercontent.com';
 
@@ -133,27 +133,48 @@ const App: React.FC = () => {
     }));
   };
 
-  const recordFollowUp = (id: string, content: string) => {
-    setEmails(prev => prev.map(email => {
-      if (email.id === id) {
-        const newCount = email.followUpCount + 1;
-        const newStatus: TrackingStatus = newCount >= 3 ? 'DISCARDED' : 'WAITING';
-        return {
-          ...email,
-          followUpCount: newCount,
-          status: newStatus,
-          lastActivityAt: Date.now(),
-          history: [...email.history, {
-            id: Math.random().toString(36).substr(2, 9),
-            type: 'followup',
-            date: Date.now(),
-            content: content
-          }]
-        };
-      }
-      return email;
-    }));
-    setSelectedEmailForFollowUp(null);
+  const recordFollowUp = async (id: string, content: string) => {
+    if (!gmailToken) {
+      alert("Gmail token missing. Please re-authorize.");
+      return;
+    }
+
+    const emailToFollowUp = emails.find(e => e.id === id);
+    if (!emailToFollowUp) return;
+
+    try {
+      // Actually send the email through Gmail API
+      await sendGmail(
+        gmailToken,
+        emailToFollowUp.recipientEmail,
+        `Follow-up: regarding our previous conversation`,
+        content.replace(/\n/g, '<br/>')
+      );
+
+      setEmails(prev => prev.map(email => {
+        if (email.id === id) {
+          const newCount = email.followUpCount + 1;
+          const newStatus: TrackingStatus = newCount >= 3 ? 'DISCARDED' : 'WAITING';
+          return {
+            ...email,
+            followUpCount: newCount,
+            status: newStatus,
+            lastActivityAt: Date.now(),
+            history: [...email.history, {
+              id: Math.random().toString(36).substr(2, 9),
+              type: 'followup',
+              date: Date.now(),
+              content: content
+            }]
+          };
+        }
+        return email;
+      }));
+      setSelectedEmailForFollowUp(null);
+    } catch (err: any) {
+      console.error("Failed to send email:", err);
+      alert(`Error sending email: ${err.message || 'Check your internet or Gmail authorization.'}`);
+    }
   };
 
   const deleteEmail = (id: string) => {
