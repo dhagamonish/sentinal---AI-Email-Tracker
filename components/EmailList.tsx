@@ -14,7 +14,12 @@ interface Props {
 const EmailList: React.FC<Props> = ({ emails, onFollowUp, onReply, onDelete, onSimulateTime }) => {
   const [filter, setFilter] = useState<TrackingStatus | 'ALL'>('ALL');
 
-  const filteredEmails = emails.filter(e => filter === 'ALL' || e.status === filter);
+  // Per PROMPT: The "General" (ALL) view should only show actionable follow-ups.
+  // "Automatically show emails that ... passed follow-up threshold. Automatically remove emails that receive replies."
+  const filteredEmails = emails.filter(e => {
+    if (filter === 'ALL') return e.status === 'NEEDS_FOLLOW_UP';
+    return e.status === filter;
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -24,11 +29,10 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onReply, onDelete, onS
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1 text-[11px] font-bold relative -mb-[2px] z-[1] transition-all ${
-              filter === f 
-                ? 'bg-[#c0c0c0] border-t-2 border-l-2 border-r-2 border-white !border-b-transparent shadow-[-1px_0_0_#000,1px_0_0_#000] z-[10]' 
+            className={`px-3 py-1 text-[11px] font-bold relative -mb-[2px] z-[1] transition-all ${filter === f
+                ? 'bg-[#c0c0c0] border-t-2 border-l-2 border-r-2 border-white !border-b-transparent shadow-[-1px_0_0_#000,1px_0_0_#000] z-[10]'
                 : 'bg-[#b0b0b0] border-t-2 border-l-2 border-r-2 border-white border-b-2 border-b-gray-600'
-            }`}
+              }`}
           >
             {f === 'ALL' ? 'General' : f.replace('NEEDS_FOLLOW_UP', 'Alerts').replace('_', ' ')}
           </button>
@@ -43,16 +47,16 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onReply, onDelete, onS
             <div className="w-1/4 border-r border-gray-400 px-2">Status</div>
             <div className="flex-1 px-2">Actions</div>
           </div>
-          
+
           {filteredEmails.length === 0 ? (
             <div className="p-10 text-center text-gray-400 text-xs italic">
-                (empty folder)
+              (empty folder)
             </div>
           ) : (
             filteredEmails.map(email => (
-              <EmailCard 
-                key={email.id} 
-                email={email} 
+              <EmailCard
+                key={email.id}
+                email={email}
                 onFollowUp={() => onFollowUp(email)}
                 onReply={(content) => onReply(email.id, content)}
                 onDelete={() => onDelete(email.id)}

@@ -13,6 +13,7 @@ export interface EmailHistoryItem {
 
 export interface EmailTracking {
   id: string;
+  threadId?: string;
   recipientName: string;
   recipientEmail: string;
   subject: string;

@@ -1,7 +1,7 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { EmailTracking } from "../types";
 
-// Helper to get configuration from localStorage
 const getConfig = () => ({
   apiKey: localStorage.getItem('sentinal_gemini_api_key') || '',
 });
@@ -11,37 +11,32 @@ export const generateFollowUpDraft = async (email: EmailTracking): Promise<strin
   if (!apiKey) return "Please set your Gemini API Key in Settings.";
 
   const ai = new GoogleGenAI({ apiKey });
-  const followUpNumber = email.followUpCount + 1;
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
   const historyContext = email.history
-    .map(h => `[${h.type.toUpperCase()} - ${new Date(h.date).toLocaleDateString()}]: ${h.content}`)
+    .map(h => `[${h.type.toUpperCase()}]: ${h.content}`)
     .join('\n\n');
 
   const prompt = `
-    Context: I am running a professional agency. I sent a cold email to ${email.recipientName} at ${email.recipientEmail}.
-    Current Status: This is Follow-up #${followUpNumber} out of a maximum of 3.
-    Previous Conversation History:
+    Role: Professional relationship manager.
+    Goal: Detect the lack of response from ${email.recipientName} and write a polite, low-pressure follow-up.
+    User Mental Model: The recipient is likely busy, not ignoring me.
+    Thread History:
     ${historyContext}
 
-    Task: Write a concise, professional, and non-pushy follow-up email.
-    Guidelines:
-    - Keep it under 100 words.
-    - Reference the previous contact lightly.
-    - Provide value or ask a low-friction question.
-    - Match the tone of the previous history.
-    - Only provide the email body text, no subject line needed.
+    Tone Architecture:
+    - Calm, professional, and helpful.
+    - Zero sales pressure.
+    - No "just checking in" clichés.
+    - Focus on being a useful resource.
+    - Under 80 words.
+
+    Output only the email body.
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-        topP: 0.8,
-      },
-    });
-
-    return response.text || "I'm sorry, I couldn't generate a draft. Please try again.";
+    const result = await model.generateContent(prompt);
+    return result.response.text();
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "Error generating AI draft. Check your connection.";
@@ -50,11 +45,11 @@ export const generateFollowUpDraft = async (email: EmailTracking): Promise<strin
 
 export const analyzeReply = async (replyText: string): Promise<{ sentiment: string; summary: string }> => {
   const prompt = `
-    Analyze this email reply from a potential client:
+    Analyze this email reply:
     "${replyText}"
 
-    Provide a very brief summary and the sentiment (Interested, Not Interested, Neutral, Needs Info).
-    Return as a simple string format: "Sentiment: [Value] | Summary: [Brief Summary]"
+    Provide a 5-word summary and categorize sentiment as one of: [Interested, Uninterested, Neutral, Questioning].
+    Format: Sentiment: [Category] | Summary: [5 words]
     `;
 
   try {
@@ -62,11 +57,9 @@ export const analyzeReply = async (replyText: string): Promise<{ sentiment: stri
     if (!apiKey) return { sentiment: 'N/A', summary: 'API Key missing.' };
 
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt
-    });
-    const text = response.text || "";
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     const [sentimentPart, summaryPart] = text.split('|');
     return {
       sentiment: sentimentPart?.replace('Sentiment:', '').trim() || 'Neutral',
