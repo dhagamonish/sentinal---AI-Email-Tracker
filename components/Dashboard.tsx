@@ -23,10 +23,10 @@ const Dashboard: React.FC<Props> = ({ stats, total }) => {
             <i className={`fas ${card.icon} ${card.color}`}></i>
             <span>{card.label}</span>
           </div>
-          <div className="win95-inset bg-black p-2 text-center">
-             <span className="text-xl font-mono text-green-400 tracking-tighter">
-                {String(card.value).padStart(3, '0')}
-             </span>
+          <div className="win95-inset bg-black p-1 text-center">
+            <span className="text-2xl font-mono text-green-500 tracking-widest">
+              {card.value}
+            </span>
           </div>
         </div>
       ))}
