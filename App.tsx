@@ -200,20 +200,16 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Simplified Action Bar */}
+        {/* Toolbar */}
         <div className="flex bg-[#c0c0c0] border-b border-gray-500 text-[12px] p-2 gap-2">
           <button className="win95-button flex items-center gap-2 font-bold" onClick={() => setIsAddModalOpen(true)}>
-            <i className="fas fa-user-plus"></i>
+            <i className="fas fa-user-plus text-green-700"></i>
             Add New Lead
-          </button>
-          <button className="win95-button flex items-center gap-2" onClick={syncWithGmail} disabled={isSyncing}>
-            <i className={`fas fa-sync ${isSyncing ? 'animate-spin' : ''}`}></i>
-            {isSyncing ? 'Scanning Inbox...' : 'Check for Replies'}
           </button>
           <div className="flex-1"></div>
           <button className="win95-button flex items-center gap-2" onClick={() => setIsSettingsOpen(true)}>
             <i className="fas fa-cog text-gray-600"></i>
-            Easy Settings
+            Settings
           </button>
         </div>
 
@@ -223,14 +219,26 @@ const App: React.FC = () => {
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[14px] font-bold flex items-center gap-2">
-                <i className="fas fa-stream"></i>
-                Active Tracking List
+                <i className="fas fa-folder-open text-amber-600"></i>
+                Inbox Monitoring
               </h2>
-              {!gmailToken && (
-                <button onClick={handleConnectGmail} className="text-[10px] text-red-600 font-bold hover:underline">
-                  ! Connect Gmail to Start Tracking
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConnectGmail}
+                  className="win95-button flex items-center gap-2 font-bold !text-[11px]"
+                >
+                  <i className={`fas fa-key ${gmailToken ? 'text-green-600' : 'text-gray-400'}`}></i>
+                  {gmailToken ? 'Gmail: Linked' : 'Connect Gmail'}
                 </button>
-              )}
+                <button
+                  onClick={syncWithGmail}
+                  disabled={isSyncing}
+                  className="win95-button flex items-center gap-2 font-bold !text-[11px]"
+                >
+                  <i className={`fas fa-sync ${isSyncing ? 'animate-spin' : 'text-blue-600'}`}></i>
+                  {isSyncing ? 'Scanning...' : 'Sync Inbox'}
+                </button>
+              </div>
             </div>
 
             <div className="win95-inset bg-white min-h-[400px]">
@@ -245,12 +253,17 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Status Bar */}
         <div className="bg-[#c0c0c0] border-t border-gray-500 p-1 flex justify-between text-[11px] text-gray-700">
-          <div className="win95-inset px-2 flex-1">{isSyncing ? 'Accessing Google API...' : 'Ready'}</div>
-          <div className="win95-inset px-2 w-48 truncate">Status: {gmailToken ? 'Authenticated' : 'Offline'}</div>
+          <div className="win95-inset px-2 flex-1">{isSyncing ? 'Accessing Google API...' : 'Ready to Monitor'}</div>
+          <div className="win95-inset px-2 w-48 truncate flex items-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${gmailToken ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            {gmailToken ? 'Authenticated' : 'Offline'}
+          </div>
         </div>
       </div>
 
+      {/* Taskbar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center gap-2 z-[100] h-10">
         <button className="win95-button flex items-center gap-2 font-bold !px-3 !py-1">
           <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Windows_95_logo.svg/2000px-Windows_95_logo.svg.png" className="w-4 h-4" alt="start" />
@@ -261,6 +274,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsSettingsOpen(false)}></div>
@@ -313,28 +327,25 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      )
-      }
+      )}
 
-      {
-        isAddModalOpen && (
-          <AddEmailModal
-            onClose={() => setIsAddModalOpen(false)}
-            onAdd={addEmail}
-          />
-        )
-      }
+      {/* Add Lead Modal */}
+      {isAddModalOpen && (
+        <AddEmailModal
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={addEmail}
+        />
+      )}
 
-      {
-        selectedEmailForFollowUp && (
-          <FollowUpGenerator
-            email={selectedEmailForFollowUp}
-            onClose={() => setSelectedEmailForFollowUp(null)}
-            onSend={recordFollowUp}
-          />
-        )
-      }
-    </div >
+      {/* Follow-up Wizard */}
+      {selectedEmailForFollowUp && (
+        <FollowUpGenerator
+          email={selectedEmailForFollowUp}
+          onClose={() => setSelectedEmailForFollowUp(null)}
+          onSend={recordFollowUp}
+        />
+      )}
+    </div>
   );
 };
 
