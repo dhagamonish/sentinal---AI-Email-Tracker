@@ -1,10 +1,16 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { EmailTracking } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Helper to get configuration from localStorage
+const getConfig = () => ({
+  apiKey: localStorage.getItem('sentinal_gemini_api_key') || '',
+});
 
 export const generateFollowUpDraft = async (email: EmailTracking): Promise<string> => {
+  const { apiKey } = getConfig();
+  if (!apiKey) return "Please set your Gemini API Key in Settings.";
+
+  const ai = new GoogleGenAI({ apiKey });
   const followUpNumber = email.followUpCount + 1;
   const historyContext = email.history
     .map(h => `[${h.type.toUpperCase()} - ${new Date(h.date).toLocaleDateString()}]: ${h.content}`)
@@ -43,7 +49,7 @@ export const generateFollowUpDraft = async (email: EmailTracking): Promise<strin
 };
 
 export const analyzeReply = async (replyText: string): Promise<{ sentiment: string; summary: string }> => {
-    const prompt = `
+  const prompt = `
     Analyze this email reply from a potential client:
     "${replyText}"
 
@@ -51,18 +57,22 @@ export const analyzeReply = async (replyText: string): Promise<{ sentiment: stri
     Return as a simple string format: "Sentiment: [Value] | Summary: [Brief Summary]"
     `;
 
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt
-        });
-        const text = response.text || "";
-        const [sentimentPart, summaryPart] = text.split('|');
-        return {
-            sentiment: sentimentPart?.replace('Sentiment:', '').trim() || 'Neutral',
-            summary: summaryPart?.replace('Summary:', '').trim() || 'No summary available.'
-        };
-    } catch (error) {
-        return { sentiment: 'Neutral', summary: 'Could not analyze reply.' };
-    }
+  try {
+    const { apiKey } = getConfig();
+    if (!apiKey) return { sentiment: 'N/A', summary: 'API Key missing.' };
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt
+    });
+    const text = response.text || "";
+    const [sentimentPart, summaryPart] = text.split('|');
+    return {
+      sentiment: sentimentPart?.replace('Sentiment:', '').trim() || 'Neutral',
+      summary: summaryPart?.replace('Summary:', '').trim() || 'No summary available.'
+    };
+  } catch (error) {
+    return { sentiment: 'Neutral', summary: 'Could not analyze reply.' };
+  }
 }
