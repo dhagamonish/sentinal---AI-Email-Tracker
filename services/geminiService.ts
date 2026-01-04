@@ -1,16 +1,17 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { FollowUpItem, EmailTracking } from "../types";
 
 /**
  * Generates a professional follow-up email draft using Gemini AI.
- * This helper handles both the simplified FollowUpItem and more detailed EmailTracking objects.
  */
 export const generateFollowUpDraft = async (item: FollowUpItem | EmailTracking): Promise<string> => {
-  // Initialize AI instance right before usage to ensure API key availability.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (!process.env.API_KEY) {
+    console.warn("Gemini API Key missing in environment. Using fallback draft.");
+    return "Hi, just checking in to see if you received my previous email about " + item.subject + ". Best, " + (item as any).senderName || "Me";
+  }
 
-  // Extract the most relevant date for context in the AI prompt.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const dateValue = 'sentAt' in item ? item.sentAt : (item as EmailTracking).lastActivityAt;
   
   const prompt = `
@@ -25,11 +26,54 @@ export const generateFollowUpDraft = async (item: FollowUpItem | EmailTracking):
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    // Extract text from the response using the .text property as per SDK documentation.
     return response.text || "Just checking in on my previous email!";
   } catch (error) {
     console.error("Gemini Draft Generation Error:", error);
-    // Provide a safe fallback message in case of API issues.
     return "Hi, just checking if you caught my last email. Best regards.";
+  }
+};
+
+/**
+ * Analyzes the content of a reply to categorize it.
+ */
+export const analyzeReplyContent = async (content: string): Promise<{category: string, summary: string}> => {
+  if (!process.env.API_KEY) {
+    return { category: 'REPLIED', summary: 'Reply detected (AI analysis unavailable)' };
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `
+    Analyze this email reply from a potential lead and categorize it.
+    Return a short summary and one of the following categories: 
+    'INTERESTED', 'NOT_INTERESTED', 'QUESTIONS', 'UNSUBSCRIBE', 'REPLIED'.
+    
+    Email Content: "${content}"
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            category: { type: Type.STRING },
+            summary: { type: Type.STRING },
+          },
+          required: ["category", "summary"]
+        }
+      }
+    });
+    
+    const result = JSON.parse(response.text || "{}");
+    return {
+      category: result.category || 'REPLIED',
+      summary: result.summary || 'Responded to your outreach.'
+    };
+  } catch (error) {
+    console.error("Gemini Analysis Error:", error);
+    return { category: 'REPLIED', summary: 'Responded to your outreach.' };
   }
 };

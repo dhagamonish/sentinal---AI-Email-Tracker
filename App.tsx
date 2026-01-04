@@ -1,16 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { FollowUpItem, EmailTracking, DashboardStats } from './types';
+import { FollowUpItem, EmailTracking, DashboardStats, HistoryItem } from './types';
 import Dashboard from './components/Dashboard';
 import EmailList from './components/EmailList';
 import FollowUpWizard from './components/FollowUpWizard';
 import ConnectModal from './components/ConnectModal';
 import AddEmailModal from './components/AddEmailModal';
-import { discoverSentLeads, checkHasReplied, initGmailAuth } from './services/gmailService';
+import { discoverSentLeads, getLatestReply, initGmailAuth } from './services/gmailService';
+import { analyzeReplyContent } from './services/geminiService';
 
-const CLIENT_ID = '911936835748-9dpk13953gm2tm3urjbeckgi8gpe209ua.apps.googleusercontent.com';
+// Updated Client ID from user's Google Cloud Console screenshot
+const CLIENT_ID = '911936835748-bpnpgp9u1hshhbrpqsn57blq1gt478ep.apps.googleusercontent.com';
 
-// TEST MODE CONFIGURATION
 const PROD_FOLLOW_UP_DELAY_MS = 24 * 60 * 60 * 1000;
 const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000;
 
@@ -49,24 +50,39 @@ const App: React.FC = () => {
       const thresholdTime = Date.now() - FOLLOW_UP_DELAY_MS;
 
       for (const lead of sentLeads) {
-        const replied = await checkHasReplied(token, lead.recipientEmail, lead.sentAt);
-        const status = replied ? 'REPLIED' : (lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING');
+        const reply = await getLatestReply(token, lead.recipientEmail, lead.sentAt);
+        let status = lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING';
+        // Fix: Explicitly type history to HistoryItem[] to allow optional properties like sentiment and summary in subsequent push operations.
+        let history: HistoryItem[] = [{
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'initial',
+          date: lead.sentAt,
+          content: lead.body || 'Auto-detected from Gmail sent items',
+          subject: lead.subject
+        }];
+
+        if (reply) {
+          const analysis = await analyzeReplyContent(reply.content);
+          status = analysis.category === 'UNSUBSCRIBE' ? 'DISCARDED' : 'REPLIED';
+          history.push({
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'reply',
+            date: reply.date,
+            content: reply.content,
+            sentiment: analysis.category,
+            summary: analysis.summary
+          });
+        }
         
         newEntries.push({
           id: lead.recipientEmail,
           recipientName: lead.recipientName,
           recipientEmail: lead.recipientEmail,
           subject: lead.subject,
-          lastActivityAt: lead.sentAt,
-          status: status,
+          lastActivityAt: reply ? reply.date : lead.sentAt,
+          status: status as any,
           followUpCount: 0,
-          history: [{
-            id: Math.random().toString(36).substr(2, 9),
-            type: 'initial',
-            date: lead.sentAt,
-            content: 'Auto-detected from Gmail sent items',
-            subject: lead.subject
-          }]
+          history: history
         });
       }
       setEmails(newEntries);
@@ -92,7 +108,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#008080]">
-      {/* Main Application Window */}
       <div className="p-2 md:p-8 flex-grow overflow-auto pb-12">
         <div className="win95-outset w-full max-w-6xl mx-auto shadow-2xl overflow-hidden">
           <div className="win95-titlebar h-7 shrink-0">
@@ -108,7 +123,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="bg-[#c0c0c0] p-2 md:p-4 space-y-4">
-            {/* Top Toolbar */}
             <div className="flex flex-wrap gap-2 justify-between items-center">
               <button 
                 onClick={() => setIsAddModalOpen(true)}
@@ -118,16 +132,10 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline">Add New Lead</span>
                 <span className="sm:hidden">Add</span>
               </button>
-              <button className="win95-button flex items-center gap-2 px-4">
-                <i className="fas fa-cog text-gray-700"></i>
-                <span className="hidden sm:inline">Settings</span>
-              </button>
             </div>
 
-            {/* Dashboard Stats */}
             <Dashboard stats={stats} total={emails.length} />
 
-            {/* Monitoring Section */}
             <div className="space-y-2">
               <div className="flex flex-wrap justify-between items-center px-1 gap-2">
                 <div className="flex items-center gap-2 font-bold text-sm">
@@ -153,7 +161,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Email List / Folder View */}
               <div className="h-[400px] md:h-[450px]">
                 <EmailList 
                   emails={emails} 
@@ -166,7 +173,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom Status Bar */}
           <div className="bg-[#c0c0c0] border-t border-gray-500 p-1 flex justify-between text-[11px] text-gray-700">
              <div className="win95-inset px-2 flex-1 h-5 flex items-center truncate">
                {isScanning ? 'Scanning...' : emails.length > 0 ? `${emails.length} items` : '(empty)'}
@@ -179,7 +185,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Connection Modal Overlay */}
       {isConnectModalOpen && (
         <ConnectModal 
           onConnect={handleConnect} 
@@ -187,7 +192,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Modals */}
       {isAddModalOpen && (
         <AddEmailModal 
           onClose={() => setIsAddModalOpen(false)} 
@@ -214,7 +218,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Bottom Taskbar */}
       <div className="fixed bottom-0 left-0 right-0 h-10 bg-[#c0c0c0] border-t-2 border-white flex items-center px-1 z-[300]">
         <button className="win95-button flex items-center gap-2 font-bold !px-3 !py-1 h-7">
           <img src="https://upload.wikimedia.org/wikipedia/commons/3/3d/Windows_logo_1992.vide.png" className="h-4" alt="Start" />
@@ -222,11 +225,10 @@ const App: React.FC = () => {
         </button>
         <div className="w-[2px] h-6 bg-gray-500 mx-1 border-r border-white"></div>
         <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold truncate">
-          Sentinal v1.2
+          Sentinal v1.3
         </div>
         <div className="flex-grow"></div>
         <div className="win95-inset h-7 px-2 md:px-3 flex items-center gap-2 text-[11px]">
-          <i className="fas fa-volume-up text-gray-600 hidden sm:inline"></i>
           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
