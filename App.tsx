@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FollowUpItem, EmailTracking, DashboardStats, HistoryItem } from './types';
 import Dashboard from './components/Dashboard';
 import EmailList from './components/EmailList';
@@ -12,7 +12,7 @@ import { analyzeReplyContent } from './services/geminiService';
 const CLIENT_ID = '911936835748-bpnpgp9u1hshhbrpqsn57blq1gt478ep.apps.googleusercontent.com';
 
 const PROD_FOLLOW_UP_DELAY_MS = 24 * 60 * 60 * 1000;
-const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000;
+const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000; // 2 minutes
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<EmailTracking[]>([]);
@@ -21,13 +21,12 @@ const App: React.FC = () => {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(!localStorage.getItem('gmail_token'));
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeFollowUp, setActiveFollowUp] = useState<EmailTracking | null>(null);
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   
-  // Persistence for Test Mode
   const [isTestMode, setIsTestMode] = useState(() => {
     const saved = localStorage.getItem('sentinal_test_mode');
     if (saved !== null) return saved === 'true';
-    const hostname = window.location.hostname;
-    return hostname === 'localhost' || hostname === '127.0.0.1' || new URLSearchParams(window.location.search).get('test_mode') === 'true';
+    return window.location.hostname === 'localhost' || new URLSearchParams(window.location.search).get('test_mode') === 'true';
   });
 
   const FOLLOW_UP_DELAY_MS = isTestMode ? TEST_FOLLOW_UP_DELAY_MS : PROD_FOLLOW_UP_DELAY_MS;
@@ -40,15 +39,7 @@ const App: React.FC = () => {
     pendingCount: 0
   };
 
-  useEffect(() => {
-    localStorage.setItem('sentinal_test_mode', String(isTestMode));
-  }, [isTestMode]);
-
-  useEffect(() => {
-    if (token) scanInbox();
-  }, [token]);
-
-  const scanInbox = async () => {
+  const scanInbox = useCallback(async () => {
     if (!token) return;
     setIsScanning(true);
     try {
@@ -59,13 +50,15 @@ const App: React.FC = () => {
 
       for (const lead of sentLeads) {
         const reply = await getLatestReply(token, lead.recipientEmail, lead.sentAt);
+        
+        // Logic: If sent before threshold (older than 2 mins in test mode), it's a follow-up alert
         let status: 'NEEDS_FOLLOW_UP' | 'WAITING' = lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING';
         
         let history: HistoryItem[] = [{
           id: Math.random().toString(36).substr(2, 9),
           type: 'initial',
           date: lead.sentAt,
-          content: lead.body || 'Auto-detected from Gmail sent items',
+          content: lead.body || 'Auto-detected from Gmail',
           subject: lead.subject
         }];
 
@@ -106,12 +99,18 @@ const App: React.FC = () => {
         }
       }
       setEmails(newEntries);
+      setLastScanTime(new Date());
     } catch (e) {
-      console.error("Scanning error:", e);
+      console.error("Scan error:", e);
     } finally {
       setIsScanning(false);
     }
-  };
+  }, [token, FOLLOW_UP_DELAY_MS]);
+
+  useEffect(() => {
+    localStorage.setItem('sentinal_test_mode', String(isTestMode));
+    if (token) scanInbox();
+  }, [isTestMode, token, scanInbox]);
 
   const handleConnect = () => {
     initGmailAuth(CLIENT_ID, (t) => {
@@ -124,11 +123,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#008080]">
       <div className="p-2 md:p-8 flex-grow overflow-auto pb-12">
-        <div className="win95-outset w-full max-w-6xl mx-auto shadow-2xl overflow-hidden">
+        <div className="win95-outset w-full max-w-6xl mx-auto shadow-2xl overflow-hidden flex flex-col">
           <div className="win95-titlebar h-7 shrink-0">
             <div className="flex items-center gap-2 truncate">
               <div className="w-3 h-3 bg-red-600 rounded-full border border-black/20"></div>
-              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '[TEST MODE]' : ''}</span>
+              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '(TURBO MODE)' : ''}</span>
             </div>
             <div className="flex gap-1 h-full py-1">
                <button className="win95-close !w-4 !h-4">_</button>
@@ -137,7 +136,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#c0c0c0] p-2 md:p-4 space-y-4">
+          <div className="bg-[#c0c0c0] p-2 md:p-4 space-y-4 flex-grow">
             <div className="flex flex-wrap gap-2 justify-between items-center">
               <button 
                 onClick={() => setIsAddModalOpen(true)}
@@ -147,28 +146,29 @@ const App: React.FC = () => {
                 <span>Add New Lead</span>
               </button>
               
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold">Turbo Mode (2m):</span>
+              <div className="win95-outset px-2 py-1 flex items-center gap-3">
+                <span className="text-[10px] font-bold">Follow-up Window:</span>
                 <button 
-                  onClick={() => {
-                    setIsTestMode(!isTestMode);
-                    // Trigger a re-scan immediately after toggling
-                    setTimeout(scanInbox, 100);
-                  }}
+                  onClick={() => setIsTestMode(!isTestMode)}
                   className={`win95-button !py-0 !px-2 text-[10px] font-bold ${isTestMode ? 'bg-[#000080] text-white' : ''}`}
                 >
-                  {isTestMode ? 'ENABLED' : 'DISABLED'}
+                  {isTestMode ? '2 MIN (TURBO)' : '24 HRS (STRICT)'}
                 </button>
               </div>
             </div>
 
             <Dashboard stats={stats} total={emails.length} />
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <div className="flex flex-wrap justify-between items-center px-1 gap-2">
                 <div className="flex items-center gap-2 font-bold text-sm">
                   <i className="fas fa-folder-open text-[#d4a017]"></i>
                   <span>Inbox Monitoring</span>
+                  {lastScanTime && (
+                    <span className="text-[10px] font-normal text-gray-600 ml-2">
+                      Last checked: {lastScanTime.toLocaleTimeString()}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button 
@@ -181,15 +181,15 @@ const App: React.FC = () => {
                   <button 
                     disabled={!token || isScanning}
                     onClick={scanInbox}
-                    className="win95-button !py-1 flex items-center gap-2 text-[11px] disabled:opacity-50"
+                    className="win95-button !py-1 flex items-center gap-2 text-[11px] disabled:opacity-50 min-w-[80px]"
                   >
                     <i className={`fas fa-sync-alt ${isScanning ? 'animate-spin' : ''}`}></i>
-                    {isScanning ? '...' : 'Refresh'}
+                    {isScanning ? 'Checking...' : 'Refresh'}
                   </button>
                 </div>
               </div>
 
-              <div className="h-[400px] md:h-[450px]">
+              <div className="h-[450px]">
                 <EmailList 
                   emails={emails} 
                   onFollowUp={(e) => setActiveFollowUp(e)}
@@ -203,11 +203,11 @@ const App: React.FC = () => {
 
           <div className="bg-[#c0c0c0] border-t border-gray-500 p-1 flex justify-between text-[11px] text-gray-700">
              <div className="win95-inset px-2 flex-1 h-5 flex items-center truncate">
-               {isScanning ? 'Scanning...' : emails.length > 0 ? `${emails.length} items detected` : 'Ready'}
+               {isScanning ? 'Processing Gmail threads...' : `Monitoring ${emails.length} leads`}
              </div>
-             <div className="win95-inset px-2 w-48 flex items-center gap-2 justify-center font-bold">
+             <div className="win95-inset px-2 w-56 flex items-center gap-2 justify-center font-bold">
                <span className={isTestMode ? 'text-blue-800' : 'text-gray-600'}>
-                 Rule: {isTestMode ? '2-Minute Window' : '24-Hour Window'}
+                 Mode: {isTestMode ? 'Developer (2m Threshold)' : 'Production (24h Threshold)'}
                </span>
              </div>
           </div>
@@ -240,7 +240,7 @@ const App: React.FC = () => {
         </button>
         <div className="w-[2px] h-6 bg-gray-500 mx-1 border-r border-white"></div>
         <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold truncate">
-          Sentinal v1.4 {isTestMode ? '(Turbo Mode Active)' : ''}
+          Sentinal AI v1.5
         </div>
         <div className="flex-grow"></div>
         <div className="win95-inset h-7 px-3 flex items-center gap-2 text-[11px]">

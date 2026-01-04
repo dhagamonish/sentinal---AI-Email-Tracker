@@ -18,6 +18,16 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
     [emails, filter]
   );
 
+  const formatTimeAgo = (timestamp: number) => {
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Property Sheet Tabs */}
@@ -32,7 +42,7 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
                 : 'bg-[#b0b0b0] border-b-2 border-b-white translate-y-[2px] opacity-80'
             }`}
           >
-            {f === 'ALL' ? 'General' : f.replace('NEEDS_FOLLOW_UP', 'Alerts').replace('WAITING', 'WAITING').replace('_', ' ')}
+            {f === 'ALL' ? 'General' : f === 'NEEDS_FOLLOW_UP' ? 'Alerts' : f}
           </button>
         ))}
       </div>
@@ -40,7 +50,8 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
       {/* Table Container */}
       <div className="flex-1 overflow-hidden bg-white win95-inset p-[1px] relative">
         <div className="flex text-[11px] font-bold bg-[#dfdfdf] border-b border-gray-400 p-1 sticky top-0 z-[10]">
-          <div className="w-1/3 border-r border-gray-400 px-3 py-1">Name</div>
+          <div className="w-1/4 border-r border-gray-400 px-3 py-1">Name</div>
+          <div className="w-1/4 border-r border-gray-400 px-3 py-1 text-center">Time Sent</div>
           <div className="w-1/4 border-r border-gray-400 px-3 py-1">Status</div>
           <div className="flex-1 px-3 py-1">Actions</div>
         </div>
@@ -54,9 +65,12 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
             <div className="flex flex-col">
               {filteredEmails.map(email => (
                 <div key={email.id} className="flex items-center text-[12px] p-2 border-b border-gray-50 hover:bg-[#000080] hover:text-white group">
-                  <div className="w-1/3 px-2 font-medium truncate">{email.recipientName}</div>
+                  <div className="w-1/4 px-2 font-medium truncate">{email.recipientName}</div>
+                  <div className="w-1/4 px-2 text-[11px] text-center font-mono opacity-80">
+                    {formatTimeAgo(email.lastActivityAt)}
+                  </div>
                   <div className="w-1/4 px-2 text-[11px]">
-                    <span className={`px-2 py-[1px] border ${email.status === 'NEEDS_FOLLOW_UP' ? 'bg-red-700 text-white border-red-900' : 'border-transparent'}`}>
+                    <span className={`px-2 py-[1px] border ${email.status === 'NEEDS_FOLLOW_UP' ? 'bg-red-700 text-white border-red-900 animate-pulse' : 'border-transparent'}`}>
                       {email.status}
                     </span>
                   </div>
