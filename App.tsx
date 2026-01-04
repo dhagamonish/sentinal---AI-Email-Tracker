@@ -11,12 +11,9 @@ import { discoverSentLeads, checkHasReplied, initGmailAuth } from './services/gm
 const CLIENT_ID = '911936835748-9dpk13953gm2tm3urjbeckgi8gpe209ua.apps.googleusercontent.com';
 
 // TEST MODE CONFIGURATION
-// 24 hours in milliseconds for production
 const PROD_FOLLOW_UP_DELAY_MS = 24 * 60 * 60 * 1000;
-// 2 minutes in milliseconds for test mode
 const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000;
 
-// Internal detection for Test Mode
 const isLocal = typeof window !== 'undefined' && 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const isTestMode = isLocal && new URLSearchParams(window.location.search).get('test_mode') === 'true';
@@ -53,7 +50,6 @@ const App: React.FC = () => {
 
       for (const lead of sentLeads) {
         const replied = await checkHasReplied(token, lead.recipientEmail, lead.sentAt);
-        // If they haven't replied AND the time elapsed is greater than our defined delay threshold
         const status = replied ? 'REPLIED' : (lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING');
         
         newEntries.push({
@@ -95,14 +91,14 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#008080]">
       {/* Main Application Window */}
-      <div className="p-4 md:p-8 flex-grow">
-        <div className="win95-outset max-w-6xl mx-auto shadow-2xl">
-          <div className="win95-titlebar h-7">
-            <div className="flex items-center gap-2">
+      <div className="p-2 md:p-8 flex-grow overflow-auto pb-12">
+        <div className="win95-outset w-full max-w-6xl mx-auto shadow-2xl overflow-hidden">
+          <div className="win95-titlebar h-7 shrink-0">
+            <div className="flex items-center gap-2 truncate">
               <div className="w-3 h-3 bg-red-600 rounded-full border border-black/20"></div>
-              <span>Sentinal AI Email Assistant</span>
+              <span className="truncate">Sentinal AI Email Assistant</span>
             </div>
             <div className="flex gap-1 h-full py-1">
                <button className="win95-close !w-4 !h-4">_</button>
@@ -111,19 +107,20 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#c0c0c0] p-4 space-y-4">
+          <div className="bg-[#c0c0c0] p-2 md:p-4 space-y-4">
             {/* Top Toolbar */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap gap-2 justify-between items-center">
               <button 
                 onClick={() => setIsAddModalOpen(true)}
                 className="win95-button flex items-center gap-2 font-bold px-4"
               >
                 <i className="fas fa-user-plus text-green-700"></i>
-                Add New Lead
+                <span className="hidden sm:inline">Add New Lead</span>
+                <span className="sm:hidden">Add</span>
               </button>
               <button className="win95-button flex items-center gap-2 px-4">
                 <i className="fas fa-cog text-gray-700"></i>
-                Settings
+                <span className="hidden sm:inline">Settings</span>
               </button>
             </div>
 
@@ -132,7 +129,7 @@ const App: React.FC = () => {
 
             {/* Monitoring Section */}
             <div className="space-y-2">
-              <div className="flex justify-between items-center px-1">
+              <div className="flex flex-wrap justify-between items-center px-1 gap-2">
                 <div className="flex items-center gap-2 font-bold text-sm">
                   <i className="fas fa-folder-open text-[#d4a017]"></i>
                   <span>Inbox Monitoring</span>
@@ -140,30 +137,30 @@ const App: React.FC = () => {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setIsConnectModalOpen(true)}
-                    className="win95-button !py-1 flex items-center gap-2 text-[11px]"
+                    className="win95-button !py-1 flex items-center gap-2 text-[10px] sm:text-[11px]"
                   >
                     <i className={`fas fa-key ${token ? 'text-green-600' : 'text-gray-500'}`}></i>
-                    Gmail: {token ? 'Linked' : 'Disconnected'}
+                    {token ? 'Linked' : 'Gmail'}
                   </button>
                   <button 
                     disabled={!token || isScanning}
                     onClick={scanInbox}
-                    className="win95-button !py-1 flex items-center gap-2 text-[11px] disabled:opacity-50"
+                    className="win95-button !py-1 flex items-center gap-2 text-[10px] sm:text-[11px] disabled:opacity-50"
                   >
                     <i className={`fas fa-sync-alt ${isScanning ? 'animate-spin' : ''}`}></i>
-                    {isScanning ? 'Scanning...' : 'Refresh'}
+                    {isScanning ? '...' : 'Refresh'}
                   </button>
                 </div>
               </div>
 
               {/* Email List / Folder View */}
-              <div className="h-[450px]">
+              <div className="h-[400px] md:h-[450px]">
                 <EmailList 
                   emails={emails} 
                   onFollowUp={(e) => setActiveFollowUp(e)}
                   onReply={async () => {}} 
                   onDelete={(id) => setEmails(prev => prev.filter(e => e.id !== id))}
-                  onSimulate={() => {}}
+                  onSimulateTime={() => {}}
                 />
               </div>
             </div>
@@ -171,12 +168,12 @@ const App: React.FC = () => {
 
           {/* Bottom Status Bar */}
           <div className="bg-[#c0c0c0] border-t border-gray-500 p-1 flex justify-between text-[11px] text-gray-700">
-             <div className="win95-inset px-2 flex-1 h-5 flex items-center">
-               {isScanning ? 'Detecting responses...' : emails.length > 0 ? `Ready - ${emails.length} items found` : '(empty folder)'}
+             <div className="win95-inset px-2 flex-1 h-5 flex items-center truncate">
+               {isScanning ? 'Scanning...' : emails.length > 0 ? `${emails.length} items` : '(empty)'}
              </div>
-             <div className="win95-inset px-2 w-40 flex items-center gap-2 justify-center">
+             <div className="win95-inset px-2 w-28 md:w-40 flex items-center gap-2 justify-center">
                <div className={`w-2 h-2 rounded-full ${token ? 'bg-green-500 shadow-[0_0_4px_#22c55e]' : 'bg-gray-400'}`}></div>
-               {token ? 'Authenticated' : 'No Connection'}
+               <span className="truncate">{token ? 'Online' : 'Offline'}</span>
              </div>
           </div>
         </div>
@@ -218,18 +215,18 @@ const App: React.FC = () => {
       )}
 
       {/* Bottom Taskbar */}
-      <div className="h-10 bg-[#c0c0c0] border-t-2 border-white flex items-center px-1 shrink-0 z-50">
+      <div className="fixed bottom-0 left-0 right-0 h-10 bg-[#c0c0c0] border-t-2 border-white flex items-center px-1 z-[300]">
         <button className="win95-button flex items-center gap-2 font-bold !px-3 !py-1 h-7">
           <img src="https://upload.wikimedia.org/wikipedia/commons/3/3d/Windows_logo_1992.vide.png" className="h-4" alt="Start" />
           <span>Start</span>
         </button>
         <div className="w-[2px] h-6 bg-gray-500 mx-1 border-r border-white"></div>
-        <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold">
+        <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold truncate">
           Sentinal v1.2
         </div>
         <div className="flex-grow"></div>
-        <div className="win95-inset h-7 px-3 flex items-center gap-2 text-[11px]">
-          <i className="fas fa-volume-up text-gray-600"></i>
+        <div className="win95-inset h-7 px-2 md:px-3 flex items-center gap-2 text-[11px]">
+          <i className="fas fa-volume-up text-gray-600 hidden sm:inline"></i>
           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>

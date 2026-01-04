@@ -13,9 +13,10 @@
             background-color: #008080; /* Classic Teal Desktop */
             font-family: "MS Sans Serif", "Tahoma", sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             overflow-x: hidden;
             image-rendering: pixelated;
+            min-height: 100vh;
         }
 
         /* 90s Bevel Utilities */
@@ -112,5 +113,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <!-- Entry point for the application -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
