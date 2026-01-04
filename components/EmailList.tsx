@@ -1,7 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { EmailTracking, TrackingStatus } from '../types';
-import EmailCard from './EmailCard';
 
 interface Props {
   emails: EmailTracking[];
@@ -11,15 +10,13 @@ interface Props {
   onSimulateTime: (id: string) => void;
 }
 
-const EmailList: React.FC<Props> = ({ emails, onFollowUp, onReply, onDelete, onSimulateTime }) => {
+const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
   const [filter, setFilter] = useState<TrackingStatus | 'ALL'>('ALL');
 
-  // Per PROMPT: The "General" (ALL) view should only show actionable follow-ups.
-  // "Automatically show emails that ... passed follow-up threshold. Automatically remove emails that receive replies."
-  const filteredEmails = emails.filter(e => {
-    if (filter === 'ALL') return e.status === 'NEEDS_FOLLOW_UP';
-    return e.status === filter;
-  });
+  const filteredEmails = useMemo(() => 
+    emails.filter(e => filter === 'ALL' || e.status === filter),
+    [emails, filter]
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -29,40 +26,59 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onReply, onDelete, onS
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1 text-[11px] font-bold relative -mb-[2px] z-[1] transition-all ${filter === f
-                ? 'bg-[#c0c0c0] border-t-2 border-l-2 border-r-2 border-white !border-b-transparent shadow-[-1px_0_0_#000,1px_0_0_#000] z-[10]'
-                : 'bg-[#b0b0b0] border-t-2 border-l-2 border-r-2 border-white border-b-2 border-b-gray-600'
-              }`}
+            className={`px-4 py-1 text-[11px] font-bold relative -mb-[2px] z-[1] transition-all border-t-2 border-l-2 border-r-2 border-white ${
+              filter === f 
+                ? 'bg-[#c0c0c0] z-[10] border-b-transparent shadow-[1px_0_0_#404040]' 
+                : 'bg-[#b0b0b0] border-b-2 border-b-white translate-y-[2px] opacity-80'
+            }`}
           >
-            {f === 'ALL' ? 'General' : f.replace('NEEDS_FOLLOW_UP', 'Alerts').replace('_', ' ')}
+            {f === 'ALL' ? 'General' : f.replace('NEEDS_FOLLOW_UP', 'Alerts').replace('WAITING', 'WAITING').replace('_', ' ')}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="grid grid-cols-1 divide-y divide-gray-200">
-          {/* Table Header Look */}
-          <div className="flex text-[11px] font-bold bg-[#dfdfdf] border border-gray-400 p-1 mb-2">
-            <div className="w-1/3 border-r border-gray-400 px-2">Name</div>
-            <div className="w-1/4 border-r border-gray-400 px-2">Status</div>
-            <div className="flex-1 px-2">Actions</div>
-          </div>
-
+      {/* Table Container */}
+      <div className="flex-1 overflow-hidden bg-white win95-inset p-[1px] relative">
+        <div className="flex text-[11px] font-bold bg-[#dfdfdf] border-b border-gray-400 p-1 sticky top-0 z-[10]">
+          <div className="w-1/3 border-r border-gray-400 px-3 py-1">Name</div>
+          <div className="w-1/4 border-r border-gray-400 px-3 py-1">Status</div>
+          <div className="flex-1 px-3 py-1">Actions</div>
+        </div>
+        
+        <div className="overflow-y-auto h-[calc(100%-30px)] bg-white">
           {filteredEmails.length === 0 ? (
-            <div className="p-10 text-center text-gray-400 text-xs italic">
-              (empty folder)
+            <div className="h-full flex items-center justify-center text-gray-400 text-xs italic">
+                (empty folder)
             </div>
           ) : (
-            filteredEmails.map(email => (
-              <EmailCard
-                key={email.id}
-                email={email}
-                onFollowUp={() => onFollowUp(email)}
-                onReply={(content) => onReply(email.id, content)}
-                onDelete={() => onDelete(email.id)}
-                onSimulate={() => onSimulateTime(email.id)}
-              />
-            ))
+            <div className="flex flex-col">
+              {filteredEmails.map(email => (
+                <div key={email.id} className="flex items-center text-[12px] p-2 border-b border-gray-50 hover:bg-[#000080] hover:text-white group">
+                  <div className="w-1/3 px-2 font-medium truncate">{email.recipientName}</div>
+                  <div className="w-1/4 px-2 text-[11px]">
+                    <span className={`px-2 py-[1px] border ${email.status === 'NEEDS_FOLLOW_UP' ? 'bg-red-700 text-white border-red-900' : 'border-transparent'}`}>
+                      {email.status}
+                    </span>
+                  </div>
+                  <div className="flex-1 px-2 flex gap-1 justify-end">
+                    {email.status === 'NEEDS_FOLLOW_UP' && (
+                      <button 
+                        onClick={() => onFollowUp(email)}
+                        className="win95-button !py-0 !px-2 !text-[10px] group-hover:!text-black font-bold"
+                      >
+                        Follow-Up
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => onDelete(email.id)}
+                      className="win95-button !py-0 !px-2 !text-[10px] group-hover:!text-black text-red-800"
+                    >
+                      Del
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

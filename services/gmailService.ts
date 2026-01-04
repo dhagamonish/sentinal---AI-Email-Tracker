@@ -1,14 +1,12 @@
 
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 
-export interface GmailMessage {
-  id: string;
-  threadId: string;
-  snippet: string;
-  from: string;
-  to: string;
-  date: string;
+export interface GmailConversation {
+  recipientEmail: string;
+  recipientName: string;
   subject: string;
+  sentAt: number;
+  threadId: string;
 }
 
 const cleanClientId = (id: string): string => {
@@ -23,113 +21,69 @@ const cleanClientId = (id: string): string => {
 export const initGmailAuth = (clientId: string, onSuccess: (token: string) => void) => {
   const finalId = cleanClientId(clientId);
   // @ts-ignore
-  if (!window.google) throw new Error("Google SDK not loaded");
-  try {
-    // @ts-ignore
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: finalId,
-      scope: SCOPES,
-      callback: (response: any) => response.access_token && onSuccess(response.access_token),
-    });
-    client.requestAccessToken();
-  } catch (error: any) {
-    throw new Error("Failed to initialize Google Auth: " + error.message);
-  }
+  const client = window.google.accounts.oauth2.initTokenClient({
+    client_id: finalId,
+    scope: SCOPES,
+    callback: (response: any) => {
+      if (response.access_token) onSuccess(response.access_token);
+    },
+  });
+  client.requestAccessToken();
 };
 
-export const fetchSentEmails = async (token: string): Promise<GmailMessage[]> => {
+/**
+ * Automatically discovers people you've emailed recently
+ */
+export const discoverSentLeads = async (token: string): Promise<GmailConversation[]> => {
   const response = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:sent&maxResults=50`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent('is:sent')}&maxResults=20`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!response.ok) return [];
   const data = await response.json();
   if (!data.messages) return [];
 
-  const details = await Promise.all(data.messages.map(async (m: { id: string }) => {
-    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const d = await res.json();
-    const headers = d.payload.headers;
-    return {
-      id: d.id,
-      threadId: d.threadId,
-      snippet: d.snippet,
-      from: headers.find((h: any) => h.name === 'From')?.value || '',
-      to: headers.find((h: any) => h.name === 'To')?.value || '',
-      date: d.internalDate,
-      subject: headers.find((h: any) => h.name === 'Subject')?.value || '',
-    };
-  }));
-  return details;
+  const leads: Map<string, GmailConversation> = new Map();
+
+  for (const msg of data.messages) {
+    const detailRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const detail = await detailRes.json();
+    
+    const headers = detail.payload.headers;
+    const to = headers.find((h: any) => h.name === 'To')?.value || '';
+    const subject = headers.find((h: any) => h.name === 'Subject')?.value || '(No Subject)';
+    const date = parseInt(detail.internalDate);
+    
+    // Extract clean email and name
+    const match = to.match(/(.*)<(.*)>/) || [null, to, to];
+    const name = match[1].trim() || match[2].split('@')[0];
+    const email = match[2].trim();
+
+    if (!leads.has(email)) {
+      leads.set(email, {
+        recipientEmail: email,
+        recipientName: name,
+        subject,
+        sentAt: date,
+        threadId: detail.threadId
+      });
+    }
+  }
+
+  return Array.from(leads.values());
 };
 
-export const checkThreadStatus = async (token: string, threadId: string): Promise<{ hasReply: boolean; snippet?: string; date?: string; from?: string }> => {
+/**
+ * Checks if a specific recipient has replied
+ */
+export const checkHasReplied = async (token: string, email: string, since: number): Promise<boolean> => {
+  const query = encodeURIComponent(`from:${email} after:${Math.floor(since / 1000)}`);
   const response = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!response.ok) return { hasReply: false };
   const data = await response.json();
-
-  // A reply is a message in the thread NOT from me
-  // For simplicity, we assume if total messages > 1, there's likely a reply, 
-  // but let's be precise: find the latest message that isn't from the user.
-  const messages = data.messages || [];
-  const replies = messages.filter((m: any) => {
-    const from = m.payload.headers.find((h: any) => h.name === 'From')?.value || '';
-    return !from.includes('me') && !from.includes(messages[0].payload.headers.find((h: any) => h.name === 'From')?.value);
-  });
-
-  if (replies.length > 0) {
-    const latest = replies[replies.length - 1];
-    return {
-      hasReply: true,
-      snippet: latest.snippet,
-      date: latest.internalDate,
-      from: latest.payload.headers.find((h: any) => h.name === 'From')?.value
-    };
-  }
-  return { hasReply: false };
-};
-
-export const sendGmail = async (token: string, to: string, subject: string, body: string, threadId?: string): Promise<boolean> => {
-  const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-  const messageParts = [
-    `To: ${to}`,
-    'Content-Type: text/html; charset=utf-8',
-    'MIME-Version: 1.0',
-    `Subject: ${utf8Subject}`,
-    ...(threadId ? [`In-Reply-To: ${threadId}`, `References: ${threadId}`] : []),
-    '',
-    body,
-  ];
-  const message = messageParts.join('\n');
-  const encodedMessage = btoa(unescape(encodeURIComponent(message))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: encodedMessage, threadId })
-  });
-  return response.ok;
-};
-
-export const fetchLatestReply = async (token: string, emailAddress: string): Promise<any | null> => {
-  const query = encodeURIComponent(`from:${emailAddress}`);
-  const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=1`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!response.ok) return null;
-  const data = await response.json();
-  if (data.messages && data.messages.length > 0) {
-    const msgId = data.messages[0].id;
-    const msgRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const msgData = await msgRes.json();
-    return { snippet: msgData.snippet, from: emailAddress, date: msgData.internalDate };
-  }
-  return null;
+  return !!(data.messages && data.messages.length > 0);
 };
