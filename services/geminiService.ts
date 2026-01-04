@@ -8,7 +8,7 @@ import { FollowUpItem, EmailTracking } from "../types";
 export const generateFollowUpDraft = async (item: FollowUpItem | EmailTracking): Promise<string> => {
   if (!process.env.API_KEY) {
     console.warn("Gemini API Key missing in environment. Using fallback draft.");
-    return "Hi, just checking in to see if you received my previous email about " + item.subject + ". Best, " + (item as any).senderName || "Me";
+    return `Hi, just checking in to see if you received my previous email about ${item.subject}. Best regards,`;
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -18,6 +18,7 @@ export const generateFollowUpDraft = async (item: FollowUpItem | EmailTracking):
     I sent a cold email to ${item.recipientName} about "${item.subject}" on ${new Date(dateValue).toLocaleDateString()}.
     They haven't replied. Write a very short (2-3 sentences), professional follow-up. 
     Don't be pushy. Just check in to see if they saw it.
+    Don't include a formal closing or signature, as one will be added automatically.
     Only return the email body.
   `;
 
@@ -29,7 +30,7 @@ export const generateFollowUpDraft = async (item: FollowUpItem | EmailTracking):
     return response.text || "Just checking in on my previous email!";
   } catch (error) {
     console.error("Gemini Draft Generation Error:", error);
-    return "Hi, just checking if you caught my last email. Best regards.";
+    return "Hi, just checking if you caught my last email.";
   }
 };
 

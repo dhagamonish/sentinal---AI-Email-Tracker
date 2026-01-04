@@ -1,5 +1,9 @@
 
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.settings.basic'
+].join(' ');
 
 export interface GmailConversation {
   recipientEmail: string;
@@ -8,6 +12,11 @@ export interface GmailConversation {
   sentAt: number;
   threadId: string;
   body?: string;
+}
+
+export interface UserProfile {
+  emailAddress: string;
+  displayName?: string;
 }
 
 /**
@@ -34,6 +43,91 @@ export const initGmailAuth = (clientId: string, onSuccess: (token: string) => vo
   });
   
   client.requestAccessToken();
+};
+
+/**
+ * Fetches the user's primary profile info
+ */
+export const getUserProfile = async (token: string): Promise<UserProfile | null> => {
+  try {
+    const response = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    return null;
+  }
+};
+
+/**
+ * Fetches the user's primary signature from Gmail settings
+ */
+export const getSignature = async (token: string): Promise<string> => {
+  try {
+    const response = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await response.json();
+    const primary = data.sendAs?.find((a: any) => a.isDefault) || data.sendAs?.[0];
+    let signature = primary?.signature || '';
+    
+    // Clean up basic HTML tags often found in signatures for the textarea
+    if (signature) {
+      signature = signature
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<(?:.|\n)*?>/gm, ''); // Strip remaining tags for plaintext editor
+    }
+    
+    return signature;
+  } catch (error) {
+    console.error("Error fetching signature:", error);
+    return '';
+  }
+};
+
+/**
+ * Sends an email using the Gmail API
+ */
+export const sendGmail = async (token: string, to: string, subject: string, body: string, threadId?: string) => {
+  const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+  const messageParts = [
+    `To: ${to}`,
+    `Subject: ${utf8Subject}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'MIME-Version: 1.0',
+    '',
+    body.replace(/\n/g, '<br>')
+  ];
+  const message = messageParts.join('\n');
+
+  const encodedEmail = btoa(unescape(encodeURIComponent(message)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const response = await fetch(
+    'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        raw: encodedEmail,
+        threadId: threadId
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error?.message || 'Failed to send email');
+  }
+  return response.json();
 };
 
 /**
