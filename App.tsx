@@ -16,8 +16,16 @@ const CLIENT_ID = '911936835748-bpnpgp9u1hshhbrpqsn57blq1gt478ep.apps.googleuser
 const PROD_FOLLOW_UP_DELAY_MS = 24 * 60 * 60 * 1000;
 const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000;
 
-// Enable test mode if ?test_mode=true is in the URL, allowing testing on Vercel or Localhost
-const isTestMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test_mode') === 'true';
+// Enhanced Test Mode: Auto-enable on localhost or if ?test_mode=true is present
+const getIsTestMode = () => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+  const hasParam = new URLSearchParams(window.location.search).get('test_mode') === 'true';
+  return isLocal || hasParam;
+};
+
+const isTestMode = getIsTestMode();
 const FOLLOW_UP_DELAY_MS = isTestMode ? TEST_FOLLOW_UP_DELAY_MS : PROD_FOLLOW_UP_DELAY_MS;
 
 const App: React.FC = () => {
@@ -49,13 +57,15 @@ const App: React.FC = () => {
       const newEntries: EmailTracking[] = [];
       
       // Threshold is determined by FOLLOW_UP_DELAY_MS (2m in test mode, 24h in prod)
-      const thresholdTime = Date.now() - FOLLOW_UP_DELAY_MS;
+      const now = Date.now();
+      const thresholdTime = now - FOLLOW_UP_DELAY_MS;
 
       for (const lead of sentLeads) {
         // Check if there is a reply to this thread
         const reply = await getLatestReply(token, lead.recipientEmail, lead.sentAt);
         
-        // Decide status based on timing threshold
+        // Decide status based on timing threshold: 
+        // If sentAt is older (smaller) than the threshold, it needs follow up.
         let status: 'NEEDS_FOLLOW_UP' | 'WAITING' = lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING';
         
         let history: HistoryItem[] = [{
@@ -132,7 +142,7 @@ const App: React.FC = () => {
           <div className="win95-titlebar h-7 shrink-0">
             <div className="flex items-center gap-2 truncate">
               <div className="w-3 h-3 bg-red-600 rounded-full border border-black/20"></div>
-              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '[TEST MODE]' : ''}</span>
+              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '[TEST MODE - 2 MIN]' : ''}</span>
             </div>
             <div className="flex gap-1 h-full py-1">
                <button className="win95-close !w-4 !h-4">_</button>
@@ -151,6 +161,11 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline">Add New Lead</span>
                 <span className="sm:hidden">Add</span>
               </button>
+              {isTestMode && (
+                <div className="text-[10px] bg-yellow-100 border border-yellow-600 px-2 py-1 font-bold text-yellow-900 animate-pulse">
+                  TESTING: 2-MINUTE REFRESH WINDOW ENABLED
+                </div>
+              )}
             </div>
 
             <Dashboard stats={stats} total={emails.length} />
@@ -244,7 +259,7 @@ const App: React.FC = () => {
         </button>
         <div className="w-[2px] h-6 bg-gray-500 mx-1 border-r border-white"></div>
         <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold truncate">
-          Sentinal v1.3 {isTestMode ? '(Test Mode)' : ''}
+          Sentinal v1.3 {isTestMode ? '(Test Mode: 2m)' : ''}
         </div>
         <div className="flex-grow"></div>
         <div className="win95-inset h-7 px-2 md:px-3 flex items-center gap-2 text-[11px]">
