@@ -12,13 +12,12 @@ import { analyzeReplyContent } from './services/geminiService';
 // Updated Client ID from user's Google Cloud Console screenshot
 const CLIENT_ID = '911936835748-bpnpgp9u1hshhbrpqsn57blq1gt478ep.apps.googleusercontent.com';
 
+// Production: 24 hours | Testing: 2 minutes
 const PROD_FOLLOW_UP_DELAY_MS = 24 * 60 * 60 * 1000;
 const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000;
 
-const isLocal = typeof window !== 'undefined' && 
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const isTestMode = isLocal && new URLSearchParams(window.location.search).get('test_mode') === 'true';
-
+// Enable test mode if ?test_mode=true is in the URL, allowing testing on Vercel or Localhost
+const isTestMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test_mode') === 'true';
 const FOLLOW_UP_DELAY_MS = isTestMode ? TEST_FOLLOW_UP_DELAY_MS : PROD_FOLLOW_UP_DELAY_MS;
 
 const App: React.FC = () => {
@@ -45,14 +44,20 @@ const App: React.FC = () => {
     if (!token) return;
     setIsScanning(true);
     try {
+      // Fetch most recent sent items
       const sentLeads = await discoverSentLeads(token);
       const newEntries: EmailTracking[] = [];
+      
+      // Threshold is determined by FOLLOW_UP_DELAY_MS (2m in test mode, 24h in prod)
       const thresholdTime = Date.now() - FOLLOW_UP_DELAY_MS;
 
       for (const lead of sentLeads) {
+        // Check if there is a reply to this thread
         const reply = await getLatestReply(token, lead.recipientEmail, lead.sentAt);
-        let status = lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING';
-        // Fix: Explicitly type history to HistoryItem[] to allow optional properties like sentiment and summary in subsequent push operations.
+        
+        // Decide status based on timing threshold
+        let status: 'NEEDS_FOLLOW_UP' | 'WAITING' = lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING';
+        
         let history: HistoryItem[] = [{
           id: Math.random().toString(36).substr(2, 9),
           type: 'initial',
@@ -63,7 +68,9 @@ const App: React.FC = () => {
 
         if (reply) {
           const analysis = await analyzeReplyContent(reply.content);
-          status = analysis.category === 'UNSUBSCRIBE' ? 'DISCARDED' : 'REPLIED';
+          // Overwrite status if they actually replied
+          const finalStatus = analysis.category === 'UNSUBSCRIBE' ? 'DISCARDED' : 'REPLIED';
+          
           history.push({
             id: Math.random().toString(36).substr(2, 9),
             type: 'reply',
@@ -72,18 +79,30 @@ const App: React.FC = () => {
             sentiment: analysis.category,
             summary: analysis.summary
           });
+
+          newEntries.push({
+            id: lead.recipientEmail,
+            recipientName: lead.recipientName,
+            recipientEmail: lead.recipientEmail,
+            subject: lead.subject,
+            lastActivityAt: reply.date,
+            status: finalStatus as any,
+            followUpCount: 0,
+            history: history
+          });
+        } else {
+          // No reply found, use the timing-based status
+          newEntries.push({
+            id: lead.recipientEmail,
+            recipientName: lead.recipientName,
+            recipientEmail: lead.recipientEmail,
+            subject: lead.subject,
+            lastActivityAt: lead.sentAt,
+            status: status as any,
+            followUpCount: 0,
+            history: history
+          });
         }
-        
-        newEntries.push({
-          id: lead.recipientEmail,
-          recipientName: lead.recipientName,
-          recipientEmail: lead.recipientEmail,
-          subject: lead.subject,
-          lastActivityAt: reply ? reply.date : lead.sentAt,
-          status: status as any,
-          followUpCount: 0,
-          history: history
-        });
       }
       setEmails(newEntries);
     } catch (e) {
@@ -113,7 +132,7 @@ const App: React.FC = () => {
           <div className="win95-titlebar h-7 shrink-0">
             <div className="flex items-center gap-2 truncate">
               <div className="w-3 h-3 bg-red-600 rounded-full border border-black/20"></div>
-              <span className="truncate">Sentinal AI Email Assistant</span>
+              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '[TEST MODE]' : ''}</span>
             </div>
             <div className="flex gap-1 h-full py-1">
                <button className="win95-close !w-4 !h-4">_</button>
@@ -225,7 +244,7 @@ const App: React.FC = () => {
         </button>
         <div className="w-[2px] h-6 bg-gray-500 mx-1 border-r border-white"></div>
         <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold truncate">
-          Sentinal v1.3
+          Sentinal v1.3 {isTestMode ? '(Test Mode)' : ''}
         </div>
         <div className="flex-grow"></div>
         <div className="win95-inset h-7 px-2 md:px-3 flex items-center gap-2 text-[11px]">
