@@ -1,5 +1,5 @@
 {
-  "name": "Sentinal - AI Email Follow-up Tracker",
-  "description": "An intelligent dashboard for agency cold emailing that tracks replies, manages multi-step follow-up sequences using Gemini AI, and ensures no lead is forgotten or over-pursued.",
+  "name": "Sentinal - Email Follow-up Tracker",
+  "description": "A professional dashboard for tracking email replies and managing follow-up sequences to ensure no lead is forgotten.",
   "requestFramePermissions": []
 }

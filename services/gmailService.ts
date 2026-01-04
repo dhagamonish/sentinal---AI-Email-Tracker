@@ -62,7 +62,7 @@ export const getUserProfile = async (token: string): Promise<UserProfile | null>
 };
 
 /**
- * Fetches the user's primary signature from Gmail settings
+ * Fetches the user's primary signature from Gmail settings (RAW HTML)
  */
 export const getSignature = async (token: string): Promise<string> => {
   try {
@@ -72,16 +72,9 @@ export const getSignature = async (token: string): Promise<string> => {
     );
     const data = await response.json();
     const primary = data.sendAs?.find((a: any) => a.isDefault) || data.sendAs?.[0];
-    let signature = primary?.signature || '';
     
-    // Clean up basic HTML tags often found in signatures for the textarea
-    if (signature) {
-      signature = signature
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<(?:.|\n)*?>/gm, ''); // Strip remaining tags for plaintext editor
-    }
-    
-    return signature;
+    // Return the raw signature string which contains HTML for images, links, and styles
+    return primary?.signature || '';
   } catch (error) {
     console.error("Error fetching signature:", error);
     return '';
@@ -89,17 +82,20 @@ export const getSignature = async (token: string): Promise<string> => {
 };
 
 /**
- * Sends an email using the Gmail API
+ * Sends a rich HTML email using the Gmail API
  */
-export const sendGmail = async (token: string, to: string, subject: string, body: string, threadId?: string) => {
+export const sendGmail = async (token: string, to: string, subject: string, htmlBody: string, threadId?: string) => {
   const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+  
+  // Construct a clean MIME message. 
+  // htmlBody already contains the combined user message + HTML signature.
   const messageParts = [
     `To: ${to}`,
     `Subject: ${utf8Subject}`,
     'Content-Type: text/html; charset="UTF-8"',
     'MIME-Version: 1.0',
     '',
-    body.replace(/\n/g, '<br>')
+    `<html><body>${htmlBody}</body></html>`
   ];
   const message = messageParts.join('\n');
 

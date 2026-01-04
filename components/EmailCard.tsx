@@ -16,7 +16,7 @@ const EmailCard: React.FC<Props> = ({ email, isSelected, onToggleSelect, onFollo
   const [showHistory, setShowHistory] = useState(false);
   const [replyInput, setReplyInput] = useState('');
   const [isReplying, setIsReplying] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const statusTags = {
     WAITING: { label: 'Waiting', color: 'text-blue-800' },
@@ -27,7 +27,7 @@ const EmailCard: React.FC<Props> = ({ email, isSelected, onToggleSelect, onFollo
 
   const handleCommitReply = async () => {
     if (!replyInput.trim()) return;
-    setIsAnalyzing(true);
+    setIsSaving(true);
     try {
       await onReply(replyInput);
       setIsReplying(false);
@@ -36,7 +36,7 @@ const EmailCard: React.FC<Props> = ({ email, isSelected, onToggleSelect, onFollo
       console.error("Failed to log reply:", err);
       alert("System error logging reply. Check connection.");
     } finally {
-      setIsAnalyzing(false);
+      setIsSaving(false);
     }
   };
 
@@ -73,7 +73,6 @@ const EmailCard: React.FC<Props> = ({ email, isSelected, onToggleSelect, onFollo
             <button onClick={() => setIsReplying(!isReplying)} className="win95-button !text-[10px] !py-0 !px-1 group-hover:!text-black">Log</button>
             <button onClick={() => setShowHistory(!showHistory)} className="win95-button !text-[10px] !py-0 !px-1 group-hover:!text-black">History</button>
             <button onClick={onDelete} className="win95-button !text-[10px] !py-0 !px-1 group-hover:!text-black text-red-700 font-bold">Del</button>
-            <button onClick={onSimulate} title="Simulate 24h Passage" className={`opacity-0 group-hover:opacity-100 px-1 text-[10px] transition-opacity ${isSelected ? 'text-white underline' : 'text-gray-400 hover:text-blue-700'}`}>+24h</button>
         </div>
       </div>
 
@@ -87,16 +86,16 @@ const EmailCard: React.FC<Props> = ({ email, isSelected, onToggleSelect, onFollo
               onChange={(e) => setReplyInput(e.target.value)}
               className="win95-inset w-full h-20 p-2 text-[11px] outline-none font-mono"
               placeholder="Paste raw reply content or notes here..."
-              disabled={isAnalyzing}
+              disabled={isSaving}
            />
            <div className="flex justify-end mt-2 gap-2">
-              <button onClick={() => setIsReplying(false)} disabled={isAnalyzing} className="win95-button !text-[11px]">Cancel</button>
+              <button onClick={() => setIsReplying(false)} disabled={isSaving} className="win95-button !text-[11px]">Cancel</button>
               <button 
                 onClick={handleCommitReply} 
-                disabled={isAnalyzing}
+                disabled={isSaving}
                 className="win95-button font-bold min-w-[80px] !text-[11px]"
               >
-                {isAnalyzing ? 'Processing...' : 'Save Log'}
+                {isSaving ? 'Processing...' : 'Save Log'}
               </button>
            </div>
         </div>
@@ -125,22 +124,6 @@ const EmailCard: React.FC<Props> = ({ email, isSelected, onToggleSelect, onFollo
                      <div className="bg-white p-1 border border-gray-200 break-words line-clamp-3">
                         {h.content}
                      </div>
-                     {h.sentiment && (
-                        <div className="flex items-center gap-2 mt-1">
-                           <span className={`text-[9px] px-1 font-bold ${
-                              h.sentiment.toLowerCase().includes('interested') && !h.sentiment.toLowerCase().includes('not') 
-                              ? 'bg-green-700 text-white' 
-                              : 'bg-gray-400 text-black'
-                           }`}>
-                              AI SENTIMENT: {h.sentiment}
-                           </span>
-                        </div>
-                     )}
-                     {h.summary && (
-                        <div className="mt-1 text-[9px] text-indigo-900 italic bg-indigo-50 p-1 border-l-2 border-indigo-500">
-                           Summary: {h.summary}
-                        </div>
-                     )}
                   </div>
                ))
              )}
