@@ -9,24 +9,10 @@ import AddEmailModal from './components/AddEmailModal';
 import { discoverSentLeads, getLatestReply, initGmailAuth } from './services/gmailService';
 import { analyzeReplyContent } from './services/geminiService';
 
-// Updated Client ID from user's Google Cloud Console screenshot
 const CLIENT_ID = '911936835748-bpnpgp9u1hshhbrpqsn57blq1gt478ep.apps.googleusercontent.com';
 
-// Production: 24 hours | Testing: 2 minutes
 const PROD_FOLLOW_UP_DELAY_MS = 24 * 60 * 60 * 1000;
 const TEST_FOLLOW_UP_DELAY_MS = 2 * 60 * 1000;
-
-// Enhanced Test Mode: Auto-enable on localhost or if ?test_mode=true is present
-const getIsTestMode = () => {
-  if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname;
-  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-  const hasParam = new URLSearchParams(window.location.search).get('test_mode') === 'true';
-  return isLocal || hasParam;
-};
-
-const isTestMode = getIsTestMode();
-const FOLLOW_UP_DELAY_MS = isTestMode ? TEST_FOLLOW_UP_DELAY_MS : PROD_FOLLOW_UP_DELAY_MS;
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<EmailTracking[]>([]);
@@ -35,6 +21,16 @@ const App: React.FC = () => {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(!localStorage.getItem('gmail_token'));
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeFollowUp, setActiveFollowUp] = useState<EmailTracking | null>(null);
+  
+  // Persistence for Test Mode
+  const [isTestMode, setIsTestMode] = useState(() => {
+    const saved = localStorage.getItem('sentinal_test_mode');
+    if (saved !== null) return saved === 'true';
+    const hostname = window.location.hostname;
+    return hostname === 'localhost' || hostname === '127.0.0.1' || new URLSearchParams(window.location.search).get('test_mode') === 'true';
+  });
+
+  const FOLLOW_UP_DELAY_MS = isTestMode ? TEST_FOLLOW_UP_DELAY_MS : PROD_FOLLOW_UP_DELAY_MS;
 
   const stats: DashboardStats = {
     active: emails.filter(e => e.status === 'WAITING').length,
@@ -45,6 +41,10 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    localStorage.setItem('sentinal_test_mode', String(isTestMode));
+  }, [isTestMode]);
+
+  useEffect(() => {
     if (token) scanInbox();
   }, [token]);
 
@@ -52,20 +52,13 @@ const App: React.FC = () => {
     if (!token) return;
     setIsScanning(true);
     try {
-      // Fetch most recent sent items
       const sentLeads = await discoverSentLeads(token);
       const newEntries: EmailTracking[] = [];
-      
-      // Threshold is determined by FOLLOW_UP_DELAY_MS (2m in test mode, 24h in prod)
       const now = Date.now();
       const thresholdTime = now - FOLLOW_UP_DELAY_MS;
 
       for (const lead of sentLeads) {
-        // Check if there is a reply to this thread
         const reply = await getLatestReply(token, lead.recipientEmail, lead.sentAt);
-        
-        // Decide status based on timing threshold: 
-        // If sentAt is older (smaller) than the threshold, it needs follow up.
         let status: 'NEEDS_FOLLOW_UP' | 'WAITING' = lead.sentAt < thresholdTime ? 'NEEDS_FOLLOW_UP' : 'WAITING';
         
         let history: HistoryItem[] = [{
@@ -78,7 +71,6 @@ const App: React.FC = () => {
 
         if (reply) {
           const analysis = await analyzeReplyContent(reply.content);
-          // Overwrite status if they actually replied
           const finalStatus = analysis.category === 'UNSUBSCRIBE' ? 'DISCARDED' : 'REPLIED';
           
           history.push({
@@ -101,7 +93,6 @@ const App: React.FC = () => {
             history: history
           });
         } else {
-          // No reply found, use the timing-based status
           newEntries.push({
             id: lead.recipientEmail,
             recipientName: lead.recipientName,
@@ -130,11 +121,6 @@ const App: React.FC = () => {
     });
   };
 
-  const handleManualAdd = (newEmail: EmailTracking) => {
-    setEmails(prev => [...prev, newEmail]);
-    setIsAddModalOpen(false);
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-[#008080]">
       <div className="p-2 md:p-8 flex-grow overflow-auto pb-12">
@@ -142,7 +128,7 @@ const App: React.FC = () => {
           <div className="win95-titlebar h-7 shrink-0">
             <div className="flex items-center gap-2 truncate">
               <div className="w-3 h-3 bg-red-600 rounded-full border border-black/20"></div>
-              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '[TEST MODE - 2 MIN]' : ''}</span>
+              <span className="truncate">Sentinal AI Email Assistant {isTestMode ? '[TEST MODE]' : ''}</span>
             </div>
             <div className="flex gap-1 h-full py-1">
                <button className="win95-close !w-4 !h-4">_</button>
@@ -158,14 +144,22 @@ const App: React.FC = () => {
                 className="win95-button flex items-center gap-2 font-bold px-4"
               >
                 <i className="fas fa-user-plus text-green-700"></i>
-                <span className="hidden sm:inline">Add New Lead</span>
-                <span className="sm:hidden">Add</span>
+                <span>Add New Lead</span>
               </button>
-              {isTestMode && (
-                <div className="text-[10px] bg-yellow-100 border border-yellow-600 px-2 py-1 font-bold text-yellow-900 animate-pulse">
-                  TESTING: 2-MINUTE REFRESH WINDOW ENABLED
-                </div>
-              )}
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold">Turbo Mode (2m):</span>
+                <button 
+                  onClick={() => {
+                    setIsTestMode(!isTestMode);
+                    // Trigger a re-scan immediately after toggling
+                    setTimeout(scanInbox, 100);
+                  }}
+                  className={`win95-button !py-0 !px-2 text-[10px] font-bold ${isTestMode ? 'bg-[#000080] text-white' : ''}`}
+                >
+                  {isTestMode ? 'ENABLED' : 'DISABLED'}
+                </button>
+              </div>
             </div>
 
             <Dashboard stats={stats} total={emails.length} />
@@ -179,7 +173,7 @@ const App: React.FC = () => {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setIsConnectModalOpen(true)}
-                    className="win95-button !py-1 flex items-center gap-2 text-[10px] sm:text-[11px]"
+                    className="win95-button !py-1 flex items-center gap-2 text-[11px]"
                   >
                     <i className={`fas fa-key ${token ? 'text-green-600' : 'text-gray-500'}`}></i>
                     {token ? 'Linked' : 'Gmail'}
@@ -187,7 +181,7 @@ const App: React.FC = () => {
                   <button 
                     disabled={!token || isScanning}
                     onClick={scanInbox}
-                    className="win95-button !py-1 flex items-center gap-2 text-[10px] sm:text-[11px] disabled:opacity-50"
+                    className="win95-button !py-1 flex items-center gap-2 text-[11px] disabled:opacity-50"
                   >
                     <i className={`fas fa-sync-alt ${isScanning ? 'animate-spin' : ''}`}></i>
                     {isScanning ? '...' : 'Refresh'}
@@ -209,41 +203,28 @@ const App: React.FC = () => {
 
           <div className="bg-[#c0c0c0] border-t border-gray-500 p-1 flex justify-between text-[11px] text-gray-700">
              <div className="win95-inset px-2 flex-1 h-5 flex items-center truncate">
-               {isScanning ? 'Scanning...' : emails.length > 0 ? `${emails.length} items` : '(empty)'}
+               {isScanning ? 'Scanning...' : emails.length > 0 ? `${emails.length} items detected` : 'Ready'}
              </div>
-             <div className="win95-inset px-2 w-28 md:w-40 flex items-center gap-2 justify-center">
-               <div className={`w-2 h-2 rounded-full ${token ? 'bg-green-500 shadow-[0_0_4px_#22c55e]' : 'bg-gray-400'}`}></div>
-               <span className="truncate">{token ? 'Online' : 'Offline'}</span>
+             <div className="win95-inset px-2 w-48 flex items-center gap-2 justify-center font-bold">
+               <span className={isTestMode ? 'text-blue-800' : 'text-gray-600'}>
+                 Rule: {isTestMode ? '2-Minute Window' : '24-Hour Window'}
+               </span>
              </div>
           </div>
         </div>
       </div>
 
       {isConnectModalOpen && (
-        <ConnectModal 
-          onConnect={handleConnect} 
-          onClose={() => setIsConnectModalOpen(false)} 
-        />
+        <ConnectModal onConnect={handleConnect} onClose={() => setIsConnectModalOpen(false)} />
       )}
 
       {isAddModalOpen && (
-        <AddEmailModal 
-          onClose={() => setIsAddModalOpen(false)} 
-          onAdd={handleManualAdd} 
-        />
+        <AddEmailModal onClose={() => setIsAddModalOpen(false)} onAdd={(e) => setEmails(p => [...p, e])} />
       )}
 
       {activeFollowUp && (
         <FollowUpWizard 
-          item={{
-            id: activeFollowUp.id,
-            recipientName: activeFollowUp.recipientName,
-            recipientEmail: activeFollowUp.recipientEmail,
-            subject: activeFollowUp.subject,
-            sentAt: activeFollowUp.lastActivityAt,
-            lastReplyAt: null,
-            threadId: ''
-          }} 
+          item={{...activeFollowUp, sentAt: activeFollowUp.lastActivityAt, lastReplyAt: null, threadId: ''}} 
           onClose={() => setActiveFollowUp(null)}
           onComplete={() => {
             setEmails(prev => prev.map(e => e.id === activeFollowUp.id ? {...e, status: 'WAITING', lastActivityAt: Date.now()} : e));
@@ -259,10 +240,10 @@ const App: React.FC = () => {
         </button>
         <div className="w-[2px] h-6 bg-gray-500 mx-1 border-r border-white"></div>
         <div className="win95-inset h-7 px-3 flex items-center text-[12px] bg-[#dfdfdf] font-bold truncate">
-          Sentinal v1.3 {isTestMode ? '(Test Mode: 2m)' : ''}
+          Sentinal v1.4 {isTestMode ? '(Turbo Mode Active)' : ''}
         </div>
         <div className="flex-grow"></div>
-        <div className="win95-inset h-7 px-2 md:px-3 flex items-center gap-2 text-[11px]">
+        <div className="win95-inset h-7 px-3 flex items-center gap-2 text-[11px]">
           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
