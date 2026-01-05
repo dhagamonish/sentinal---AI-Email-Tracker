@@ -29,9 +29,9 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Property Sheet Tabs */}
-      <div className="flex gap-[2px] px-2 pt-2 bg-[#c0c0c0]">
+      <div className="flex gap-[2px] px-2 pt-2 bg-[#c0c0c0] shrink-0">
         {(['ALL', 'WAITING', 'NEEDS_FOLLOW_UP', 'REPLIED', 'DISCARDED'] as const).map(f => (
           <button
             key={f}
@@ -48,17 +48,18 @@ const EmailList: React.FC<Props> = ({ emails, onFollowUp, onDelete }) => {
       </div>
 
       {/* Table Container */}
-      <div className="flex-1 overflow-hidden bg-white win95-inset p-[1px] relative">
-        <div className="flex text-[11px] font-bold bg-[#dfdfdf] border-b border-gray-400 p-1 sticky top-0 z-[10]">
+      <div className="flex-grow flex flex-col overflow-hidden bg-white win95-inset p-[1px] relative">
+        <div className="flex text-[11px] font-bold bg-[#dfdfdf] border-b border-gray-400 p-1 sticky top-0 z-[10] shrink-0">
           <div className="w-1/4 border-r border-gray-400 px-3 py-1">Name</div>
           <div className="w-1/4 border-r border-gray-400 px-3 py-1 text-center">Time Sent</div>
           <div className="w-1/4 border-r border-gray-400 px-3 py-1">Status</div>
           <div className="flex-1 px-3 py-1">Actions</div>
         </div>
         
-        <div className="overflow-y-auto h-[calc(100%-30px)] bg-white">
+        {/* Only this part will scroll */}
+        <div className="flex-grow overflow-y-auto bg-white scrollbar-gutter-stable min-h-0">
           {filteredEmails.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-400 text-xs italic">
+            <div className="h-full min-h-[100px] flex items-center justify-center text-gray-400 text-xs italic">
                 (empty folder)
             </div>
           ) : (

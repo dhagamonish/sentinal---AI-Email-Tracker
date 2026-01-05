@@ -31,8 +31,21 @@ const ConnectModal: React.FC<Props> = ({ onConnect, onClose }) => {
             </div>
           </div>
 
+          <div className="win95-inset bg-[#ffffcc] p-3 text-[10px] text-gray-800 border-l-4 border-yellow-500">
+            <div className="font-bold mb-1 flex items-center gap-1">
+              <i className="fas fa-exclamation-triangle text-yellow-600"></i>
+              <span>Login Troubleshooting</span>
+            </div>
+            <p className="mb-1">If you see a <b>"Google hasn't verified this app"</b> screen:</p>
+            <ol className="list-decimal ml-4 space-y-1">
+              <li>Click <b>"Advanced"</b> on the Google page.</li>
+              <li>Click <b>"Go to sentinaltracker.vercel.app (unsafe)"</b> at the bottom.</li>
+            </ol>
+            <p className="mt-1 opacity-70 italic">This is normal for personal development projects.</p>
+          </div>
+
           <div className="win95-inset bg-[#dfdfdf] p-2 text-[10px] text-gray-600 italic">
-            Note: We only request read-only access to scan for replies.
+            Note: We only request read-only access to scan for replies and send access for follow-ups.
           </div>
 
           <div className="flex justify-center pt-2 gap-2">

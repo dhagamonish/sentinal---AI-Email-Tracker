@@ -1,5 +1,8 @@
 {
-  "name": "Sentinal - Email Follow-up Tracker",
-  "description": "A professional dashboard for tracking email replies and managing follow-up sequences to ensure no lead is forgotten.",
-  "requestFramePermissions": []
+  "name": "Sentinal",
+  "description": "AI-powered cold email follow-up tracker.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }
