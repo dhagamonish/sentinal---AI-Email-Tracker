@@ -1,6 +1,6 @@
 {
   "name": "Sentinal",
-  "description": "AI-powered cold email follow-up tracker.",
+  "description": "Professional cold email follow-up tracker and outreach assistant.",
   "requestFramePermissions": [
     "camera",
     "microphone"

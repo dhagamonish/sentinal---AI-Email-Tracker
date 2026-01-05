@@ -140,7 +140,7 @@ const App: React.FC = () => {
     <div className="fixed bottom-10 left-0 w-64 win95-outset z-[500] flex animate-in slide-in-from-bottom-2 duration-100">
       <div className="w-8 bg-[#808080] flex items-end justify-center py-4 shrink-0 overflow-hidden">
         <span className="text-white font-bold text-lg tracking-[0.2em] whitespace-nowrap -rotate-90 origin-center mb-16 opacity-40 select-none">
-          SENTINAL AI
+          SENTINAL
         </span>
       </div>
       <div className="flex-grow py-1 bg-[#c0c0c0] shadow-inner">

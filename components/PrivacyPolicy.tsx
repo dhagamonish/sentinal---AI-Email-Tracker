@@ -22,32 +22,32 @@ const PrivacyPolicy: React.FC<Props> = ({ onBack }) => {
           <section>
             <h2 className="font-bold underline mb-1">1. Scope of Data Access</h2>
             <p>
-              Sentinal AI accesses your Gmail account using official Google OAuth protocols. Our application is architected to be <b>privacy-first</b>:
+              Sentinal accesses your Gmail account using official Google OAuth protocols. Our application is architected to be <b>privacy-first</b>:
             </p>
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>We only read metadata from your "Sent" folder to track recipient addresses and subjects.</li>
-              <li>We scan thread updates to detect when a lead has provided a response.</li>
-              <li>We transmit follow-up emails only upon your explicit command.</li>
+              <li>We check thread status to detect when a recipient has provided a response to your outreach.</li>
+              <li>We facilitate the sending of follow-up emails only upon your manual trigger.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="font-bold underline mb-1">2. Data Usage & AI Policy</h2>
+            <h2 className="font-bold underline mb-1">2. Data Usage & Security</h2>
             <p>
-              Your email content is analyzed by the Gemini 3 Flash model solely for the purpose of generating drafts and sentiment classification. We <b>never</b> use your private emails to train general models, and we do not sell your outreach data to third-party advertisers.
+              Your email metadata is used solely for the purpose of identifying reply status and organizing your outreach workflow. We <b>never</b> store your email body content on our servers, and we do not sell your outreach data to third-party advertisers or data brokers.
             </p>
           </section>
 
           <section>
             <h2 className="font-bold underline mb-1">3. Local Storage</h2>
             <p>
-              Lead names and statuses are stored in your browser's local cache. Clearing your browser data will disconnect the assistant and reset your tracking history.
+              Lead names and statuses are stored in your browser's local cache. This ensures that your tracking data remains under your control within your local environment. Clearing your browser data will disconnect the assistant and reset your tracking history.
             </p>
           </section>
 
           <section className="bg-white/30 p-3 border border-gray-400 italic">
             For further inquiries regarding data handling, please reach out to: <br/>
-            <span className="font-bold text-blue-900 select-all">legal@sentinalassistant.io</span>
+            <span className="font-bold text-blue-900 select-all">team@bycontrolplusa.co.in</span>
           </section>
         </div>
       </div>
