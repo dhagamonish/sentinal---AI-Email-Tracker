@@ -23,31 +23,24 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeFollowUp, setActiveFollowUp] = useState<EmailTracking | null>(null);
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
-  const [openModal, setOpenModal] = useState<'privacy' | 'terms' | null>(null);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
+  
+  // Simple Client-Side Path Routing
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // Sync state with hash for direct URL access
   useEffect(() => {
-    const handleHash = () => {
-      const hash = window.location.hash;
-      if (hash === '#/privacy') setOpenModal('privacy');
-      else if (hash === '#/terms') setOpenModal('terms');
-      else setOpenModal(null);
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
     };
-    window.addEventListener('hashchange', handleHash);
-    handleHash();
-    return () => window.removeEventListener('hashchange', handleHash);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const closeModal = () => {
-    setOpenModal(null);
-    window.location.hash = '';
-  };
-
-  const openLegal = (type: 'privacy' | 'terms') => {
-    setOpenModal(type);
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
     setIsStartMenuOpen(false);
-    window.location.hash = `#/${type}`;
+    window.scrollTo(0, 0);
   };
 
   const stats: DashboardStats = {
@@ -139,32 +132,40 @@ const App: React.FC = () => {
   const StartMenu = () => (
     <div className="fixed bottom-10 left-0 w-64 win95-outset z-[500] flex animate-in slide-in-from-bottom-2 duration-100">
       <div className="w-8 bg-[#808080] flex items-end justify-center py-4 shrink-0 overflow-hidden">
-        <span className="text-white font-bold text-lg tracking-[0.2em] whitespace-nowrap -rotate-90 origin-center mb-16 opacity-40 select-none">
-          SENTINAL
+        <span className="text-white font-bold text-lg tracking-[0.2em] whitespace-nowrap -rotate-90 origin-center mb-16 opacity-40 select-none uppercase">
+          Sentinal
         </span>
       </div>
       <div className="flex-grow py-1 bg-[#c0c0c0] shadow-inner">
-        <button onClick={() => { setOpenModal(null); setIsStartMenuOpen(false); }} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
+        <button onClick={() => navigate('/')} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
           <i className="fas fa-desktop text-blue-700 w-4 group-hover:text-white"></i>
-          <span>Main Dashboard</span>
+          <span>Main Desktop</span>
         </button>
         <div className="h-[1px] bg-gray-500 my-1 mx-2"></div>
-        <button onClick={() => openLegal('privacy')} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
+        <button onClick={() => navigate('/privacy')} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
           <i className="fas fa-user-shield text-green-700 w-4 group-hover:text-white"></i>
           <span>Privacy Policy</span>
         </button>
-        <button onClick={() => openLegal('terms')} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
+        <button onClick={() => navigate('/terms')} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
           <i className="fas fa-balance-scale text-orange-700 w-4 group-hover:text-white"></i>
           <span>Terms of Service</span>
         </button>
         <div className="h-[1px] bg-gray-400 my-1 mx-2"></div>
         <button onClick={() => window.location.reload()} className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-[#000080] hover:text-white text-[12px] group">
           <i className="fas fa-power-off text-red-700 w-4 group-hover:text-white"></i>
-          <span>Shut Down Assistant</span>
+          <span>Shut Down</span>
         </button>
       </div>
     </div>
   );
+
+  // Router View Selection
+  if (currentPath === '/privacy') {
+    return <PrivacyPolicy onBack={() => navigate('/')} />;
+  }
+  if (currentPath === '/terms') {
+    return <TermsOfService onBack={() => navigate('/')} />;
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#008080] overflow-hidden">
@@ -174,12 +175,12 @@ const App: React.FC = () => {
           <div className="win95-titlebar h-7 shrink-0">
             <div className="flex items-center gap-2 truncate">
               <i className="fas fa-shield-alt text-[10px]"></i>
-              <span className="truncate">Sentinal Email Assistant</span>
+              <span className="truncate uppercase font-bold">Sentinal Email Assistant</span>
             </div>
             <div className="flex gap-1 h-full py-1">
                <button className="win95-close !w-4 !h-4">_</button>
                <button className="win95-close !w-4 !h-4">□</button>
-               <button className="win95-close !w-4 !h-4">x</button>
+               <button onClick={() => window.location.reload()} className="win95-close !w-4 !h-4">x</button>
             </div>
           </div>
 
@@ -191,7 +192,7 @@ const App: React.FC = () => {
               </button>
               
               <div className="win95-outset px-3 py-1 flex items-center gap-3">
-                <span className="text-[10px] font-bold">Evaluation Window:</span>
+                <span className="text-[10px] font-bold uppercase">Evaluation Window:</span>
                 <div className="bg-[#dfdfdf] px-2 py-[2px] win95-inset text-[10px] font-bold text-blue-900">
                   24 HOURS (STRICT)
                 </div>
@@ -204,11 +205,11 @@ const App: React.FC = () => {
 
             <div className="space-y-2 flex flex-col flex-grow overflow-hidden">
               <div className="flex flex-wrap justify-between items-center px-1 gap-2 shrink-0">
-                <div className="flex items-center gap-2 font-bold text-sm">
+                <div className="flex items-center gap-2 font-bold text-sm uppercase">
                   <i className="fas fa-folder-open text-[#d4a017]"></i>
                   <span>Outreach Tracking</span>
                   {lastScanTime && (
-                    <span className="text-[10px] font-normal text-gray-600 ml-2 italic">
+                    <span className="text-[10px] font-normal text-gray-600 ml-2 italic lowercase">
                       Updated: {lastScanTime.toLocaleTimeString()}
                     </span>
                   )}
@@ -243,28 +244,15 @@ const App: React.FC = () => {
                {isScanning ? 'Accessing Gmail secure protocols...' : `System tracking ${emails.filter(e => e.status !== 'DISCARDED').length} active records.`}
              </div>
              <div className="win95-inset px-2 flex items-center gap-3 text-[10px] font-bold">
-               <button onClick={() => openLegal('privacy')} className="hover:text-blue-800 underline active:text-red-600">Privacy Policy</button>
+               <button onClick={() => navigate('/privacy')} className="hover:text-blue-800 underline active:text-red-600">Privacy Policy</button>
                <div className="w-[1px] h-3 bg-gray-500"></div>
-               <button onClick={() => openLegal('terms')} className="hover:text-blue-800 underline active:text-red-600">Terms of Use</button>
+               <button onClick={() => navigate('/terms')} className="hover:text-blue-800 underline active:text-red-600">Terms of Use</button>
                <div className="w-[1px] h-3 bg-gray-500"></div>
                <span className="text-gray-500 font-normal">v1.5 FINAL</span>
              </div>
           </div>
         </div>
       </div>
-
-      {/* Overlays / Modals */}
-      {openModal === 'privacy' && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/20 overflow-auto">
-          <PrivacyPolicy onBack={closeModal} />
-        </div>
-      )}
-
-      {openModal === 'terms' && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/20 overflow-auto">
-          <TermsOfService onBack={closeModal} />
-        </div>
-      )}
 
       {isConnectModalOpen && (
         <ConnectModal onConnect={handleConnect} onClose={() => setIsConnectModalOpen(false)} />
@@ -304,8 +292,8 @@ const App: React.FC = () => {
         </div>
         <div className="w-[2px] h-7 bg-gray-500 mx-2 border-r border-white"></div>
         <button 
-          onClick={() => { setOpenModal(null); setIsStartMenuOpen(false); }}
-          className={`win95-inset h-8 px-4 flex items-center text-[11px] bg-[#dfdfdf] font-bold truncate transition-all ${!openModal ? 'bg-[#dfdfdf]' : 'bg-[#c0c0c0] win95-outset shadow-none'}`}
+          onClick={() => { navigate('/'); }}
+          className={`win95-inset h-8 px-4 flex items-center text-[11px] bg-[#dfdfdf] font-bold truncate transition-all ${currentPath === '/' ? 'bg-[#dfdfdf]' : 'bg-[#c0c0c0] win95-outset shadow-none'}`}
         >
           <i className="fas fa-envelope-open-text mr-2 text-blue-800"></i>
           Sentinal.exe
